@@ -1,0 +1,8 @@
+description: logging.warn -> logging.warning, warning gone at runtime
+tags: []
+strict_warnings: true
+expected:
+- rule: STD-0003
+  file: src/notifier.py
+  line: 7
+  fix: template_ok

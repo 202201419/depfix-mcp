@@ -1,0 +1,8 @@
+description: 'removed API: tests are red before the fix and green after'
+tags: []
+strict_warnings: false
+expected:
+- rule: STD-0006
+  file: src/codec.py
+  line: 5
+  fix: template_ok

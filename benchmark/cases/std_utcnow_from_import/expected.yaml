@@ -1,0 +1,8 @@
+description: 'from datetime import datetime: no ''timezone'' available, so no template'
+tags: []
+strict_warnings: false
+expected:
+- rule: STD-0001
+  file: src/clock.py
+  line: 5
+  fix: not_applicable

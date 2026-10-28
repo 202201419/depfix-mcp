@@ -1,0 +1,23 @@
+{
+  "cases": 16,
+  "expected_findings": 17,
+  "precision": 1.0,
+  "recall": 1.0,
+  "fix_success_rate": 1.0,
+  "correct_refusal_rate": 1.0,
+  "false_accept_rate": 0.0,
+  "unsafe_patch_rate": 0.0,
+  "oracle_discrimination": 0.7857,
+  "known_gap_cases": {
+    "np_getattr_dynamic": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1
+    },
+    "np_shadowed_param": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 0
+    }
+  }
+}

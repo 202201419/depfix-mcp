@@ -1,0 +1,8 @@
+description: utcnow() must stay naive, and the warning must really be gone
+tags: []
+strict_warnings: true
+expected:
+- rule: STD-0001
+  file: src/clock.py
+  line: 5
+  fix: template_ok

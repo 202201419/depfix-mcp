@@ -1,0 +1,4 @@
+description: 'np is a local object, not numpy: nothing may be reported'
+tags: []
+strict_warnings: false
+expected: []

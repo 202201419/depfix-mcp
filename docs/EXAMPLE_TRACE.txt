@@ -1,0 +1,82 @@
+$ depfix scan /tmp/demo
+ID          RULE      STATUS    LOCATION                          SNIPPET
+7447a803ff  STD-0003  found     src/app.py:6                      logging.warn
+
+1 finding(s). State saved in .depfix/state.db
+
+$ depfix propose 7447a803ff --repo /tmp/demo
+outcome: proposed
+
+logging.warn is a deprecated alias of logging.warning. (rule STD-0003)
+source: https://docs.python.org/3/library/logging.html#logging.warning
+
+--- a/src/app.py
++++ b/src/app.py
+@@ -3,7 +3,7 @@
+ 
+ 
+ def greet(name):
+-    logging.warn('hi %s', name)
++    logging.warning('hi %s', name)
+     return f'hello {name}'
+ 
+ 
+
+$ depfix verify 7447a803ff --repo /tmp/demo --allow-local-exec
+[PASSED ] diff_scope    touches only src/app.py
+[PASSED ] applies       patch applies cleanly
+[PASSED ] parses        patched file parses
+[PASSED ] finding_gone  target usage removed, no new deprecated usage introduced
+[PASSED ] diff_minimal  1 line(s) replaced by 1, all inside the finding
+[PASSED ] tests         all tests pass after the patch
+
+result: VERIFIED  confidence: high
+
+$ depfix trace 7447a803ff --repo /tmp/demo
+== 1. SCAN: what was found ==
+{
+  "id": "7447a803ff",
+  "rule_id": "STD-0003",
+  "library": "stdlib",
+  "file": "src/app.py",
+  "start_line": 6,
+  "start_col": 4,
+  "end_line": 6,
+  "end_col": 16,
+  "snippet": "logging.warn",
+  "file_sha256": "7c86dfbd1492e4ddc9016cdf3b3931410d6bd8d0a20e4c3868335e630d51d9d6",
+  "status": "verified",
+  "note": ""
+}
+
+== 2. RULE: why it matched ==
+STD-0003 [attribute] logging.warn
+logging.warn is a deprecated alias of logging.warning.
+source: https://docs.python.org/3/library/logging.html#logging.warning
+fix kind: template  template: {logging.warning}
+
+== 3. NAME RESOLUTION: how this file spells things ==
+imports seen: {'logging': 'logging', 'threading': 'threading'}   ambiguous: []
+  {logging.warning} -> logging.warning
+
+== 4. PROPOSE: the change ==
+--- a/src/app.py
++++ b/src/app.py
+@@ -3,7 +3,7 @@
+ 
+ 
+ def greet(name):
+-    logging.warn('hi %s', name)
++    logging.warning('hi %s', name)
+     return f'hello {name}'
+ 
+ 
+
+== 5. VERIFY: the checks ==
+[PASSED ] diff_scope: touches only src/app.py
+[PASSED ] applies: patch applies cleanly
+[PASSED ] parses: patched file parses
+[PASSED ] finding_gone: target usage removed, no new deprecated usage introduced
+[PASSED ] diff_minimal: 1 line(s) replaced by 1, all inside the finding
+[PASSED ] tests: all tests pass after the patch
+overall: PASSED  confidence: high

@@ -1,0 +1,9 @@
+description: one real usage plus text mentions in another file; only one file may
+  change
+tags: []
+strict_warnings: false
+expected:
+- rule: NP-0004
+  file: src/a.py
+  line: 3
+  fix: template_ok

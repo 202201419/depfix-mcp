@@ -1,0 +1,16 @@
+description: three independent findings in one file, each fixed by its own patch
+tags: []
+strict_warnings: false
+expected:
+- rule: STD-0003
+  file: src/run.py
+  line: 7
+  fix: template_ok
+- rule: STD-0005
+  file: src/run.py
+  line: 8
+  fix: template_ok
+- rule: STD-0001
+  file: src/run.py
+  line: 9
+  fix: template_ok
