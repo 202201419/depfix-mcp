@@ -31,7 +31,8 @@ ALLOWED: dict[Status, frozenset[Status]] = {
     Status.PROPOSED: frozenset({Status.VERIFIED, Status.FAILED}),
     Status.FAILED: frozenset({Status.PROPOSED}),
     Status.VERIFIED: frozenset({Status.APPROVED, Status.PROPOSED}),
-    Status.APPROVED: frozenset({Status.APPLIED}),
+    # an approval can be revoked or expire, which sends the finding back to VERIFIED
+    Status.APPROVED: frozenset({Status.APPLIED, Status.VERIFIED}),
     Status.SKIPPED: frozenset(),
     Status.APPLIED: frozenset(),
 }
@@ -132,7 +133,7 @@ class Finding(BaseModel):
 class Proposal(BaseModel):
     finding_id: str
     file: str
-    kind: Literal["template"] = "template"
+    kind: Literal["template", "llm"] = "template"
     replacement: str
     diff: str
     diff_sha256: str
@@ -140,6 +141,9 @@ class Proposal(BaseModel):
     rationale: str
     reference_url: str
     created_at: str = ""
+    # Model-written fixes (drop 3) must cite sources: chunk ids, and the text of those chunks.
+    citations: list[str] = []
+    evidence: dict[str, str] = {}
 
 
 class CheckResult(BaseModel):
@@ -155,3 +159,14 @@ class Verification(BaseModel):
     confidence: Literal["high", "low"]
     checks: list[CheckResult]
     ran_at: str = ""
+
+
+class Approval(BaseModel):
+    """A human said yes to ONE exact diff. The mac proves the record was made by depfix."""
+
+    finding_id: str
+    diff_sha256: str
+    approved_at: str
+    expires_at: str
+    mac: str
+    used: bool = False

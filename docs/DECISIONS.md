@@ -72,3 +72,47 @@ reports honestly that 3 of 14 cases (the multi-finding file) cannot distinguish 
 
 **D19. Pinned environment via `uv.lock`.** Your results match mine. Python 3.12, NumPy 2.x for
 the benchmark only (not a runtime dependency).
+
+# Drop 2 decisions
+
+**D20. A `Runner` abstraction.** Only the project's code (tests, linters) is untrusted, so only
+that goes through a runner. `git apply` works on OUR diff and stays local. The checks do not know
+which runner they use, so the same verifier runs in Docker, locally, and (tests) with fakes.
+
+**D21. The whole sandbox is one pure function.** `DockerRunner.build_argv` returns the exact
+`docker run` command, so a unit test can assert every flag even where Docker is unavailable. The
+real isolation is then proven from inside a container by `depfix sandbox check`.
+
+**D22. Docker by default; local needs `--allow-local-exec`.** Safe defaults beat convenient ones.
+
+**D23. Refuse to run as root.** `--user 0:0` would make the container root, defeating `--user`.
+
+**D24. Kill containers by name on timeout.** Killing the `docker run` client leaves the container
+running. A timeout also takes priority over exit code 125 (which means "docker itself failed").
+
+**D25. Approval is a person typing in a terminal.** `approve` refuses without a TTY and is not
+exposed to the MCP server. An approval is bound to the diff hash, expires in 15 minutes, and is
+single-use. Low-confidence verifications require typing the finding id, so a reflex "y" is not enough.
+
+**D26. An HMAC key outside the repo.** Editing the database by hand cannot forge an approval
+without `~/.config/depfix/approval.key`. This is defence in depth, not a boundary against a
+program that can read your home folder (documented in `docs/SAFETY.md`).
+
+**D27. Invalid approvals are revoked, not just refused.** Expired, forged or mismatched approvals
+delete the record and send the finding back to VERIFIED, so a person must look at the diff again.
+
+**D28. Apply is a dry run unless `--execute`, on a new branch, with clean-state preflight.** The
+branch makes undo trivial; refusing on dirty or untracked files means we never mix our change into
+your unsaved work. Failures roll back to the starting branch.
+
+**D29. Judge a project by its own tools.** Lint and type checks run only if the project configures
+ruff or mypy, and compare issues before vs after WITHOUT line numbers. Pre-existing problems are
+not blamed on the patch.
+
+**D30. Provenance: templates are re-derived, model output must cite.** A template diff must equal
+what the rule produces byte for byte. A model fix must cite chunks, and every new name it
+introduces must appear in them (a rule-based groundedness check, no judge model). Limit: a source
+can support a wrong change.
+
+**D31. `rule_example` re-runs the rule's claim inside the verification environment.** The
+container's library versions can differ from yours.

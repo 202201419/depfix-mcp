@@ -1,4 +1,4 @@
-.PHONY: setup check lint types test bench baseline selftest
+.PHONY: setup check lint types test bench baseline selftest smoke-docker
 
 setup:
 	uv sync
@@ -21,6 +21,12 @@ baseline:
 
 selftest:
 	uv run depfix rules --selftest
+
+# Needs Docker running. Builds the sandbox image (the one step that uses the network), then proves
+# from INSIDE the container that the network is blocked, the filesystem is read-only, and so on.
+smoke-docker:
+	uv run depfix sandbox build
+	uv run depfix sandbox check
 
 # One command, one summary. Paste the tail of this output when reporting a problem.
 check: lint types test selftest

@@ -27,6 +27,10 @@ def test_illegal_transitions_raise(old, new):
         check_transition(old, new)
 
 
+def test_an_approval_can_be_revoked():
+    check_transition(Status.APPROVED, Status.VERIFIED)
+
+
 def test_legal_path_to_applied():
     path = [Status.FOUND, Status.PROPOSED, Status.VERIFIED, Status.APPROVED, Status.APPLIED]
     for a, b in zip(path, path[1:], strict=False):

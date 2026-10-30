@@ -1,112 +1,52 @@
 """Stage 4: verify a proposal on an isolated COPY of the repo before a human ever sees it.
 
-DROP 1 LIMIT (read this): the project's tests run as a local subprocess. We copy the repo, strip
-the environment, apply a timeout and CPU/file-size limits, and kill the whole process group on
-timeout, but there is NO network or filesystem isolation yet. That arrives with the container
-runner in drop 2. Until then, only verify code you trust.
+The project's own code (its tests, linters, type checker) runs through a Runner (runner.py):
+a throw-away Docker container by default, or a plain local process for code you fully trust.
+Only the project's code is untrusted, so only that goes through the runner; `git apply` works on
+our own diff and stays a local, time-limited process.
 """
 
 from __future__ import annotations
 
 import ast
+import builtins
 import difflib
 import hashlib
-import os
+import re
 import shutil
-import signal
-import subprocess
-import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .diffing import diff_paths, has_forbidden_markers, split_lines
-from .models import CheckResult, Finding, Proposal, Verification, now_iso
+from .fixer import propose_template
+from .models import CheckResult, Finding, Proposal, Rule, Verification, now_iso
 from .rules import RuleSet
+from .runner import LocalRunner, Runner, run_limited, sandbox_env
 from .scanner import UnsupportedFile, scan_text
+from .selftest import selftest_rule
 
 COPY_IGNORE = (
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
-    ".depfix",
-    "node_modules",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".pytest_cache",
-    ".hypothesis",
-)
+    ".git", ".venv", "venv", "__pycache__", ".depfix", "node_modules",
+    ".mypy_cache", ".ruff_cache", ".pytest_cache", ".hypothesis",
+)  # fmt: skip
 MAX_XML_BYTES = 5_000_000
-
-# Runs inside the child process before exec: set CPU-time and file-size limits, then become the
-# real command. A launcher script (not subprocess's preexec_fn) because preexec_fn is documented
-# as unsafe in programs that use threads, and the benchmark runs cases in a thread pool.
-_LAUNCHER = (
-    "import os, resource, sys\n"
-    "t = int(sys.argv[1])\n"
-    "for lim, val in ((resource.RLIMIT_CPU, t), (resource.RLIMIT_FSIZE, 200 * 1024 * 1024)):\n"
-    "    try:\n"
-    "        resource.setrlimit(lim, (val, val))\n"
-    "    except (ValueError, OSError):\n"
-    "        pass\n"
-    "os.execvp(sys.argv[2], sys.argv[2:])\n"
-)
 
 
 @dataclass
 class VerifyConfig:
-    python: str = sys.executable  # interpreter that runs the PROJECT's tests (needs pytest)
+    runner: Runner = field(default_factory=LocalRunner)
+    python: str | None = None  # interpreter inside the runner; None means the runner's default
     timeout_s: int = 120
     max_changed_lines: int = 6
     run_tests: bool = True
+    run_static: bool = True
 
-
-@dataclass
-class Proc:
-    returncode: int
-    output: str
-    timed_out: bool
-
-
-def sandbox_env(home: Path) -> dict[str, str]:
-    """A minimal environment: no inherited secrets (cloud keys, tokens) reach the tests."""
-    return {
-        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-        "HOME": str(home),
-        "TMPDIR": str(home),
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "PYTHONHASHSEED": "0",
-        "PYTHONUTF8": "1",
-    }
-
-
-def run_limited(cmd: list[str], cwd: Path, timeout: int, env: dict[str, str]) -> Proc:
-    """Run a fixed argument list (never a shell string) with a timeout and resource limits."""
-    with tempfile.TemporaryFile() as out:  # a file, so a chatty process cannot fill our memory
-        proc = subprocess.Popen(
-            [sys.executable, "-c", _LAUNCHER, str(timeout + 5), *cmd],
-            cwd=cwd,
-            env=env,
-            stdout=out,
-            stderr=subprocess.STDOUT,
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-        timed_out = False
-        try:
-            proc.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            os.killpg(proc.pid, signal.SIGKILL)  # whole group, so child processes die too
-            proc.wait()
-        out.seek(0, os.SEEK_END)
-        size = out.tell()
-        out.seek(max(0, size - 20_000))
-        text = out.read().decode("utf-8", errors="replace")
-    return Proc(proc.returncode, text, timed_out)
+    @property
+    def interpreter(self) -> str:
+        return self.python or self.runner.default_python()
 
 
 def copy_repo(src: Path, dst: Path) -> None:
@@ -132,7 +72,7 @@ def apply_patch(workdir: Path, diff: str, scratch: Path) -> tuple[bool, str]:
     return True, "patch applies cleanly"
 
 
-# ---- individual checks -------------------------------------------------------------------------
+# ---- cheap checks (pure Python) ----------------------------------------------------------------
 
 
 def check_diff_scope(f: Finding, p: Proposal) -> CheckResult:
@@ -150,10 +90,9 @@ def check_diff_scope(f: Finding, p: Proposal) -> CheckResult:
     paths = diff_paths(p.diff)
     if paths != {f.file}:
         return CheckResult(
-            name=name,
-            status="failed",
+            name=name, status="failed",
             detail=f"diff touches {sorted(paths)}, expected only {f.file}",
-        )
+        )  # fmt: skip
     if any(".." in Path(x).parts or Path(x).is_absolute() for x in paths):
         return CheckResult(name=name, status="failed", detail="diff path escapes the repo")
     if "\n@@" not in "\n" + p.diff:
@@ -186,15 +125,14 @@ def check_finding_gone(f: Finding, orig: bytes, patched: bytes, rules: RuleSet) 
     expected += Counter()  # drop zero/negative counts
     if after == expected:
         return CheckResult(
-            name=name,
-            status="passed",
+            name=name, status="passed",
             detail="target usage removed, no new deprecated usage introduced",
-        )
+        )  # fmt: skip
     extra = after - expected
     detail = (
         f"still or newly deprecated: {[f'{r}:{s}' for (r, s) in extra]}"
         if extra
-        else ("the target usage was not removed")
+        else "the target usage was not removed"
     )
     return CheckResult(name=name, status="failed", detail=detail)
 
@@ -210,26 +148,98 @@ def check_diff_minimal(f: Finding, old: str, new: str, cap: int) -> CheckResult:
         inside = (lo <= i1 <= hi + 1) if i1 == i2 else (i1 >= lo and i2 - 1 <= hi)
         if not inside:
             return CheckResult(
-                name=name,
-                status="failed",
+                name=name, status="failed",
                 detail=f"edit at lines {i1 + 1}-{i2} is outside the finding "
                 f"(lines {f.start_line}-{f.end_line})",
-            )
+            )  # fmt: skip
         old_changed += i2 - i1
         new_changed += j2 - j1
     if old_changed == 0 and new_changed == 0:
         return CheckResult(name=name, status="failed", detail="the patch changes nothing")
     if max(old_changed, new_changed) > cap:
         return CheckResult(
-            name=name,
-            status="failed",
+            name=name, status="failed",
             detail=f"{max(old_changed, new_changed)} changed lines exceeds cap {cap}",
-        )
+        )  # fmt: skip
     return CheckResult(
-        name=name,
-        status="passed",
+        name=name, status="passed",
         detail=f"{old_changed} line(s) replaced by {new_changed}, all inside the finding",
+    )  # fmt: skip
+
+
+def new_names(old: str, new: str) -> set[str]:
+    """Attribute and variable names the patch introduces (builtins like `list` are exempt)."""
+
+    def names(text: str) -> set[str]:
+        tree = ast.parse(text)
+        return {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)} | {
+            n.id for n in ast.walk(tree) if isinstance(n, ast.Name)
+        }
+
+    return names(new) - names(old) - set(dir(builtins))
+
+
+def check_provenance(
+    orig: Path, f: Finding, p: Proposal, rules: RuleSet, old: str, new: str
+) -> CheckResult:
+    """Where did this change come from, and is it backed by a source?
+
+    Template fixes: re-derive the diff from the rule and require an EXACT match, so a doctored
+    proposal cannot pose as 'the rule's fix'.
+    Model fixes (drop 3): the fix must cite sources, and every new name it introduces must
+    appear in the cited text (a rule-based groundedness check, no judge model).
+    """
+    name = "provenance"
+    if p.kind == "template":
+        rule = rules.by_id.get(f.rule_id)
+        res = propose_template(orig, f, rule) if rule else None
+        if (
+            res
+            and res.outcome == "proposed"
+            and res.proposal
+            and res.proposal.diff_sha256 == p.diff_sha256
+        ):
+            return CheckResult(
+                name=name, status="passed", detail="diff is exactly what the rule produces"
+            )
+        return CheckResult(
+            name=name, status="failed", detail="diff is not what the rule's template produces"
+        )
+    if not p.citations:
+        return CheckResult(name=name, status="failed", detail="a model-written fix cites no source")
+    missing = [c for c in p.citations if c not in p.evidence]
+    if missing:
+        return CheckResult(name=name, status="failed", detail=f"cited chunks not found: {missing}")
+    cited_text = " ".join(p.evidence[c] for c in p.citations)
+    unsupported = sorted(n for n in new_names(old, new) if n not in cited_text)
+    if unsupported:
+        return CheckResult(
+            name=name, status="failed",
+            detail=f"new names not found in the cited sources: {unsupported}",
+        )  # fmt: skip
+    return CheckResult(
+        name=name, status="passed", detail=f"every new name is supported by {p.citations}"
     )
+
+
+# ---- checks that run the project's code (through the runner) -----------------------------------
+
+
+def check_rule_example(rule: Rule | None, cfg: VerifyConfig) -> CheckResult:
+    """Re-run the rule's own example in the SAME environment that runs the tests.
+
+    The container's library versions may differ from yours; this proves the rule's claim
+    (before warns/fails, after works the same) there.
+    """
+    name = "rule_example"
+    if rule is None or rule.example is None:
+        return CheckResult(
+            name=name, status="skipped", detail="this rule has no executable example"
+        )
+    problems = selftest_rule(rule, cfg.interpreter, cfg.runner)
+    if problems:
+        return CheckResult(name=name, status="failed", detail="; ".join(problems))
+    return CheckResult(name=name, status="passed", detail=f"{rule.id} example holds in this runner")
 
 
 @dataclass
@@ -255,6 +265,7 @@ def failed_ids(xml_path: Path) -> set[str] | None:
 
 
 def run_pytest(
+    runner: Runner,
     python: str,
     workdir: Path,
     scratch: Path,
@@ -262,19 +273,15 @@ def run_pytest(
     label: str,
     extra: list[str] | None = None,
 ) -> PytestRun:
-    xml = scratch / f"{label}.xml"
+    # "{scratch}" is translated by the runner: a real path locally, /scratch in a container.
     cmd = [
-        python,
-        "-m",
-        "pytest",
-        "-q",
-        "-p",
-        "no:cacheprovider",
-        f"--junitxml={xml}",
-        *(extra or []),
-    ]
-    r = run_limited(cmd, workdir, timeout, sandbox_env(scratch))
-    return PytestRun(r.returncode, failed_ids(xml), tail(r.output), r.timed_out)
+        python, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+        f"--junitxml={{scratch}}/{label}.xml", *(extra or []),
+    ]  # fmt: skip
+    r = runner.run(cmd, workdir=workdir, scratch=scratch, timeout=timeout)
+    return PytestRun(
+        r.returncode, failed_ids(scratch / f"{label}.xml"), tail(r.output), r.timed_out
+    )
 
 
 def check_tests(
@@ -286,16 +293,16 @@ def check_tests(
     A test that already failed before the patch is not blamed on the patch.
     """
     name = "tests"
-    before = run_pytest(cfg.python, orig, scratch, cfg.timeout_s, "before")
-    after = run_pytest(cfg.python, patched, scratch, cfg.timeout_s, "after")
+    py = cfg.interpreter
+    before = run_pytest(cfg.runner, py, orig, scratch, cfg.timeout_s, "before")
+    after = run_pytest(cfg.runner, py, patched, scratch, cfg.timeout_s, "after")
     if after.timed_out:
         return CheckResult(name=name, status="failed", detail="tests timed out after patch"), False
     if "No module named pytest" in after.tail:
         return CheckResult(
-            name=name,
-            status="failed",
-            detail="pytest is not installed for the interpreter given by --python",
-        ), False
+            name=name, status="failed",
+            detail="pytest is not installed in the interpreter/image used for verification",
+        ), False  # fmt: skip
     if after.returncode == 5:
         return CheckResult(name=name, status="skipped", detail="no tests were collected"), False
     if after.returncode == 0:
@@ -305,15 +312,89 @@ def check_tests(
     if after.failed is None:
         return CheckResult(
             name=name, status="failed", detail=f"could not read test results:\n{after.tail}"
-        ), False
+        ), False  # fmt: skip
     new_failures = after.failed - (before.failed or set())
     if new_failures:
         return CheckResult(
             name=name, status="failed", detail=f"new failures: {sorted(new_failures)}\n{after.tail}"
-        ), False
+        ), False  # fmt: skip
     return CheckResult(
         name=name, status="passed", detail=f"no new failures ({len(after.failed)} pre-existing)"
-    ), False
+    ), False  # fmt: skip
+
+
+# ---- the project's own linter / type checker ---------------------------------------------------
+
+_TOOL_ARGS = {
+    "ruff": ["-m", "ruff", "check", "--output-format=concise", "--no-cache"],
+    "mypy": ["-m", "mypy", "--no-incremental", "--no-error-summary", "--no-color-output"],
+}
+_ISSUE = {
+    "ruff": re.compile(r"^(?P<f>[^:\n]+):\d+:\d+: (?P<m>.+)$"),
+    "mypy": re.compile(r"^(?P<f>[^:\n]+):\d+(?::\d+)?: (?P<m>(?:error|warning):.+)$"),
+}
+_CHECK_NAME = {"ruff": "lint", "mypy": "types"}
+
+
+def detect_tools(root: Path) -> set[str]:
+    """Which checkers does THIS project use? We only judge a project by its own rules."""
+
+    def read(name: str) -> str:
+        p = root / name
+        return p.read_text(encoding="utf-8", errors="replace") if p.is_file() else ""
+
+    pyproject, setup_cfg = read("pyproject.toml"), read("setup.cfg")
+    found: set[str] = set()
+    if (
+        (root / "ruff.toml").is_file()
+        or (root / ".ruff.toml").is_file()
+        or "[tool.ruff" in pyproject
+    ):
+        found.add("ruff")
+    if (
+        (root / "mypy.ini").is_file()
+        or (root / ".mypy.ini").is_file()
+        or "[tool.mypy" in pyproject
+        or "[mypy" in setup_cfg
+    ):
+        found.add("mypy")
+    return found
+
+
+def tool_issues(tool: str, output: str) -> Counter[str]:
+    """Issues WITHOUT line numbers, so an unrelated line shift is not mistaken for a new issue."""
+    issues: Counter[str] = Counter()
+    for line in output.splitlines():
+        m = _ISSUE[tool].match(line.strip())
+        if m:
+            issues[f"{m['f']}: {m['m']}"] += 1
+    return issues
+
+
+def check_static(
+    tool: str, orig: Path, patched: Path, scratch: Path, f: Finding, cfg: VerifyConfig
+) -> CheckResult:
+    name = _CHECK_NAME[tool]
+    if tool not in detect_tools(orig):
+        return CheckResult(name=name, status="skipped", detail=f"project does not configure {tool}")
+    cmd = [cfg.interpreter, *_TOOL_ARGS[tool], f.file]
+    before = cfg.runner.run(cmd, workdir=orig, scratch=scratch, timeout=cfg.timeout_s)
+    after = cfg.runner.run(cmd, workdir=patched, scratch=scratch, timeout=cfg.timeout_s)
+    for r in (before, after):
+        if f"No module named {tool}" in r.output or r.timed_out or r.returncode not in (0, 1):
+            return CheckResult(
+                name=name, status="skipped", detail=f"{tool} could not run: {tail(r.output, 3)}"
+            )
+    new = tool_issues(tool, after.output) - tool_issues(tool, before.output)
+    if new:
+        return CheckResult(
+            name=name, status="failed",
+            detail=f"{sum(new.values())} new {tool} issue(s): {sorted(new)[:3]}",
+        )  # fmt: skip
+    return CheckResult(name=name, status="passed", detail=f"no new {tool} issues")
+
+
+# ---- the orchestrator --------------------------------------------------------------------------
 
 
 def verify_proposal(
@@ -352,7 +433,7 @@ def verify_proposal(
                     name="applies",
                     status="failed",
                     detail="file changed since the proposal was made; propose again",
-                )
+                )  # fmt: skip
             )
             return finish()
         shutil.copytree(orig, patched, symlinks=True)
@@ -363,17 +444,21 @@ def verify_proposal(
             return finish()
         old_bytes = (orig / f.file).read_bytes()
         new_bytes = (patched / f.file).read_bytes()
+        old_text, new_text = old_bytes.decode("utf-8"), new_bytes.decode("utf-8")
         add(check_finding_gone(f, old_bytes, new_bytes, rules))
-        add(
-            check_diff_minimal(
-                f, old_bytes.decode("utf-8"), new_bytes.decode("utf-8"), cfg.max_changed_lines
-            )
-        )
+        add(check_diff_minimal(f, old_text, new_text, cfg.max_changed_lines))
         if any(c.status == "failed" for c in checks):
-            return finish()  # do not spend time running tests on a patch that already failed
+            return finish()  # do not start containers for a patch that already failed
+        # Provenance does not gate the expensive checks: a doctored proposal still gets the full
+        # report, but it can never pass.
+        add(check_provenance(orig, f, p, rules, old_text, new_text))
         if not cfg.run_tests:
             add(CheckResult(name="tests", status="skipped", detail="disabled by configuration"))
             return finish()
+        add(check_rule_example(rules.by_id.get(f.rule_id), cfg))
+        if cfg.run_static:
+            for tool in ("ruff", "mypy"):
+                add(check_static(tool, orig, patched, scratch, f, cfg))
         result, clean = check_tests(orig, patched, scratch, cfg)
         add(result)
         return finish(clean)

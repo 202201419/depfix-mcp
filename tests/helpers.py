@@ -74,3 +74,34 @@ def proposal_for(f: Finding, old: str, new: str, file: str | None = None) -> Pro
         rationale="test",
         reference_url="https://example.invalid",
     )
+
+
+# ---- drop 2 helpers ----------------------------------------------------------------------------
+
+import subprocess  # noqa: E402
+
+from depfix import pipeline  # noqa: E402
+from depfix.runner import LocalRunner  # noqa: E402
+from depfix.verify import VerifyConfig  # noqa: E402
+
+
+def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(repo), *args], capture_output=True, text=True, check=False
+    )
+
+
+def git_init(repo: Path) -> None:
+    (repo / ".gitignore").write_text(".depfix/\n")
+    for args in (["init", "-q", "-b", "main"], ["add", "-A"], ["commit", "-q", "-m", "init"]):
+        assert git(repo, *args).returncode == 0, args
+
+
+def make_verified(repo: Path, run_tests: bool = False) -> str:
+    """scan -> propose -> verify the logging.warn finding; returns its id."""
+    findings, _ = pipeline.scan(repo)
+    fid = next(f.id for f in findings if f.rule_id == "STD-0003")
+    assert pipeline.propose(repo, fid).outcome == "proposed"
+    v = pipeline.verify(repo, fid, VerifyConfig(runner=LocalRunner(), run_tests=run_tests))
+    assert v.passed, [(c.name, c.status, c.detail) for c in v.checks]
+    return fid

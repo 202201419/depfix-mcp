@@ -22,12 +22,17 @@ source: https://docs.python.org/3/library/logging.html#logging.warning
  
  
 
-$ depfix verify 7447a803ff --repo /tmp/demo --allow-local-exec
+$ depfix verify 7447a803ff --repo /tmp/demo --runner local --allow-local-exec
+runner: local
 [PASSED ] diff_scope    touches only src/app.py
 [PASSED ] applies       patch applies cleanly
 [PASSED ] parses        patched file parses
 [PASSED ] finding_gone  target usage removed, no new deprecated usage introduced
 [PASSED ] diff_minimal  1 line(s) replaced by 1, all inside the finding
+[PASSED ] provenance    diff is exactly what the rule produces
+[PASSED ] rule_example  STD-0003 example holds in this runner
+[SKIPPED] lint          project does not configure ruff
+[SKIPPED] types         project does not configure mypy
 [PASSED ] tests         all tests pass after the patch
 
 result: VERIFIED  confidence: high
@@ -78,5 +83,12 @@ imports seen: {'logging': 'logging', 'threading': 'threading'}   ambiguous: []
 [PASSED ] parses: patched file parses
 [PASSED ] finding_gone: target usage removed, no new deprecated usage introduced
 [PASSED ] diff_minimal: 1 line(s) replaced by 1, all inside the finding
+[PASSED ] provenance: diff is exactly what the rule produces
+[PASSED ] rule_example: STD-0003 example holds in this runner
+[SKIPPED] lint: project does not configure ruff
+[SKIPPED] types: project does not configure mypy
 [PASSED ] tests: all tests pass after the patch
 overall: PASSED  confidence: high
+
+== 6. APPROVAL ==
+(none; status=verified)

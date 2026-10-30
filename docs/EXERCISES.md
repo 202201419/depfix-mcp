@@ -69,3 +69,55 @@ Run `uv run pytest -q` after each, then `git checkout -- .` to undo.
 
 Notice how few tests catch each bug. That is the point of exercise 6 in section A: a test suite
 is only as good as the mutations it kills.
+
+---
+
+# Drop 2 exercises
+
+## A. Break-it (predict first; each answer was verified by running the mutation)
+
+| # | Change | What fails | Why |
+|---|--------|-----------|-----|
+| 1 | In `approval.check`, replace the diff-hash comparison with `if False:` | `test_approval_for_another_diff_is_rejected` | an approval would stay valid for a different diff |
+| 2 | In `pipeline.apply_fix`, make the APPROVED-status guard `if False:` | `test_apply_without_approval_is_refused`, `test_an_approval_cannot_be_used_twice` | verification and human approval could be skipped |
+| 3 | In `DockerRunner.build_argv`, delete the `--network none` pair | `test_every_isolation_flag_is_present` | the sandbox would have internet |
+| 4 | In `apply.preflight`, make the dirty-file check `if False:` | `test_uncommitted_changes_to_the_file_are_refused` | the fix would mix into your unsaved edits |
+| 5 | In `verify.check_provenance`, make the template failure return `passed` | `test_a_doctored_template_diff_cannot_pass_as_the_rules_fix` | a tweaked diff could pose as the rule's fix |
+| 6 | In `cli.cmd_approve`, make the `isatty` check `if False:` | `test_approve_refuses_without_an_interactive_terminal` | a script could approve by piping "y" |
+| 7 | In `apply.apply_on_branch.rollback`, delete the switch-back and branch delete | `test_failed_apply_rolls_back_completely` | a failed apply would leave you on a stray branch |
+| 8 | In `pipeline.apply_fix`, delete the lines that revoke an invalid approval | `test_expired_approval_is_revoked` | an expired approval would stay usable |
+
+## B. Trace it
+
+1. Read `docs/EXAMPLE_APPLY.txt`, then run the same session on your own project with a tiny
+   `logging.warn` call. For each printed line, name the function that printed it.
+2. After `approve`, edit the file by one character and run `apply`. Predict the message, then find
+   the exact line of code that produced it.
+3. After `approve`, wait 15 minutes (or edit the expiry with a test) and run `apply`. What is the
+   status afterwards, and why?
+
+## C. Quiz (answers at the bottom)
+
+1. Why does `approve` refuse when there is no terminal?
+2. Why is the diff's SHA-256 stored in three places (proposal, report, approval)?
+3. Why must the MAC key live outside the repository?
+4. What is the difference between `--runner local` and `--runner docker`, in one sentence?
+5. Why does a timeout kill the container by name instead of killing the process?
+6. Why are lint issues compared WITHOUT line numbers?
+7. Name two things `apply` checks before it creates the branch.
+8. What does `provenance` check for a template fix, and what for a model fix?
+
+### Answers
+
+1. An approval is a person's decision; a script or an AI tool piping "y" must not be able to make it.
+2. Each stage re-checks that the diff it handles is the exact one verified and approved; a swap at
+   any point shows up as a hash mismatch.
+3. An editor of the repo (or a tool with repo access) could otherwise forge approvals.
+4. Docker runs the project's code in a network-less, read-only, non-root, resource-limited
+   container; local runs it as a normal process on your machine with no isolation.
+5. Killing the `docker run` client leaves the container itself running.
+6. Inserting a line above shifts every later line number; the same issue would look new.
+7. Any two of: git repo root, on a branch, file tracked, file clean, branch name free, the file
+   unchanged since verification, the approval valid for this exact diff.
+8. Template: the diff must equal what the rule produces exactly. Model: it must cite sources and
+   every new name must appear in the cited text.
