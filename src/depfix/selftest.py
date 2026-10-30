@@ -1,4 +1,4 @@
-"""Rule self-tests: run each rule's `example` on the interpreter you are using.
+"""Rule self-tests: run each rule's `example` in a Runner (your interpreter, or the container).
 
 A rule is a claim ("np.float_ is removed; np.float64 works the same"). The self-test checks that
 claim empirically: the 'before' must really fail or warn, and the 'after' must really work.
@@ -7,13 +7,12 @@ claim empirically: the 'before' must really fail or warn, and the 'after' must r
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 
 from .models import Rule
 from .rules import RuleSet
-from .verify import run_limited, sandbox_env
+from .runner import LocalRunner, Runner
 
 _SCRIPT = r"""
 import json, sys, warnings
@@ -38,14 +37,18 @@ print("DEPFIX_RESULT " + json.dumps(out))
 """
 
 
-def selftest_rule(rule: Rule, python: str = sys.executable) -> list[str]:
+def selftest_rule(rule: Rule, python: str | None = None, runner: Runner | None = None) -> list[str]:
+    runner = runner or LocalRunner()
+    python = python or runner.default_python()
     ex = rule.example
     if ex is None:
         return []  # model-path rules have no executable example
     spec = {"setup": ex.setup, "before": ex.before, "after": ex.after}
     with tempfile.TemporaryDirectory(prefix="depfix-selftest-") as td:
         home = Path(td)
-        r = run_limited([python, "-c", _SCRIPT, json.dumps(spec)], home, 60, sandbox_env(home))
+        r = runner.run(
+            [python, "-c", _SCRIPT, json.dumps(spec)], workdir=home, scratch=home, timeout=60
+        )
     line = next((ln for ln in r.output.splitlines() if ln.startswith("DEPFIX_RESULT ")), None)
     if line is None:
         return [f"{rule.id}: example did not run: {r.output[-300:]}"]
@@ -75,5 +78,7 @@ def selftest_rule(rule: Rule, python: str = sys.executable) -> list[str]:
     return problems
 
 
-def selftest_all(rules: RuleSet, python: str = sys.executable) -> dict[str, list[str]]:
-    return {r.id: selftest_rule(r, python) for r in rules.rules}
+def selftest_all(
+    rules: RuleSet, python: str | None = None, runner: Runner | None = None
+) -> dict[str, list[str]]:
+    return {r.id: selftest_rule(r, python, runner) for r in rules.rules}

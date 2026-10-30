@@ -41,6 +41,10 @@ def test_good_patch_is_accepted_with_high_confidence(repo, finding):
         "parses",
         "finding_gone",
         "diff_minimal",
+        "provenance",
+        "rule_example",
+        "lint",
+        "types",
         "tests",
     ]
 

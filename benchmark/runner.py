@@ -29,6 +29,7 @@ import yaml
 
 from depfix import pipeline
 from depfix.rules import RuleSet, load_rules
+from depfix.runner import LocalRunner
 from depfix.store import Store
 from depfix.verify import VerifyConfig, apply_patch, copy_repo, run_pytest
 
@@ -82,7 +83,7 @@ def hidden_run(
 ) -> bool:
     shutil.copytree(case / "hidden_tests", base / "hidden_tests", dirs_exist_ok=True)
     extra = ["hidden_tests"] + (["-W", "error::DeprecationWarning"] if strict else [])
-    run = run_pytest(python, base, scratch, 120, label, extra)
+    run = run_pytest(LocalRunner(), python, base, scratch, 120, label, extra)
     return run.returncode == 0
 
 
@@ -101,7 +102,7 @@ def run_case(case: Path, rules: RuleSet, python: str) -> CaseResult:
         res.tp = len(expected.keys() & got.keys())
         res.fp = len(got.keys() - expected.keys())
         res.fn = len(expected.keys() - got.keys())
-        cfg = VerifyConfig(python=python, timeout_s=120)
+        cfg = VerifyConfig(runner=LocalRunner(), python=python, timeout_s=120)
 
         for key, e in expected.items():
             fo = FixOutcome(expected=e["fix"], outcome="missed")

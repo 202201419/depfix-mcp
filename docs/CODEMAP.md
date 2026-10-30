@@ -5,7 +5,7 @@ out, and the one thing to understand before moving on. A real session is in
 `docs/EXAMPLE_TRACE.txt`; run `depfix trace <id>` on your own finding to see the same thing live.
 
 ```
-repo --scan--> Finding --propose--> Proposal(diff) --verify--> Verification --(drop 2: approve, apply)
+repo --scan--> Finding --propose--> Proposal(diff) --verify--> Verification --approve--> Approval --apply--> git branch
          ^           ^                    ^                        ^
       rules.yaml   aliases of          template or             checks on a COPY
                    that file           (drop 3: model)         of the repo
@@ -41,8 +41,8 @@ repo --scan--> Finding --propose--> Proposal(diff) --verify--> Verification --(d
 | No shell strings | all commands are argument lists | by construction |
 | Symlinks never followed | `scanner.iter_python_files`, `copytree(symlinks=True)` | `test_scan_repo_skips...` |
 
-**Not yet true (drop 2):** network and filesystem isolation. `verify` runs the project's tests as a
-local process, which is why the CLI demands `--allow-local-exec`.
+**Changed in drop 2:** the Docker runner provides network and filesystem isolation (see
+`docs/SANDBOX.md`, `docs/SAFETY.md`). The local runner still has none, and says so.
 
 ## Known limits of the scanner (measured by the benchmark's known-gap cases)
 
@@ -56,3 +56,26 @@ local process, which is why the CLI demands `--allow-local-exec`.
 ## Counts (for orientation)
 
 21 rules (13 NumPy, 8 stdlib), about 1,500 lines of source, 103 tests, 18 benchmark cases.
+
+
+## Drop 2 additions (read after the table above)
+
+| File | Role | In -> Out | Understand this |
+|------|------|-----------|-----------------|
+| `runner.py` | WHERE project code runs | command -> `Proc` | `build_argv` is the whole sandbox: every safety flag is one list item |
+| `approval.py` | Human yes, made unforgeable | diff hash -> signed `Approval` | the MAC key lives outside the repo; approvals expire and are single-use |
+| `apply.py` | Changing the real repo, safely | diff -> git branch + commit | refuse first, then branch, then apply, and roll back on any failure |
+| `verify.py` (changed) | Four new checks | | `provenance`, `rule_example`, `lint`, `types`; tools judge a project by ITS OWN config |
+| `pipeline.py` (changed) | `approve` and `apply_fix` | | `confirm` is the human; there is no way to approve without calling it |
+| `cli.py` (changed) | `approve`, `apply`, `sandbox` | | `approve` refuses without a terminal; `apply` is a dry run unless `--execute` |
+
+### Life of a finding, now ending in git
+
+```
+scan -> propose -> verify (container) -> approve (a person, in a terminal) -> apply --execute
+        FOUND      PROPOSED   VERIFIED          APPROVED                          APPLIED
+```
+
+A real session is in `docs/EXAMPLE_APPLY.txt`.
+
+Counts: 21 rules, about 2,100 lines of source, 143 tests, 18 benchmark cases.

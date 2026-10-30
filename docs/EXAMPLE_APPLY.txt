@@ -1,0 +1,91 @@
+
+$ depfix propose 7447a803ff --repo /tmp/demo2
+outcome: proposed
+
+logging.warn is a deprecated alias of logging.warning. (rule STD-0003)
+source: https://docs.python.org/3/library/logging.html#logging.warning
+
+--- a/src/app.py
++++ b/src/app.py
+@@ -3,7 +3,7 @@
+ 
+ 
+ def greet(name):
+-    logging.warn('hi %s', name)
++    logging.warning('hi %s', name)
+     return f'hello {name}'
+ 
+ 
+
+
+$ depfix verify 7447a803ff --repo /tmp/demo2 --runner local --allow-local-exec
+runner: local
+[PASSED ] diff_scope    touches only src/app.py
+[PASSED ] applies       patch applies cleanly
+[PASSED ] parses        patched file parses
+[PASSED ] finding_gone  target usage removed, no new deprecated usage introduced
+[PASSED ] diff_minimal  1 line(s) replaced by 1, all inside the finding
+[PASSED ] provenance    diff is exactly what the rule produces
+[PASSED ] rule_example  STD-0003 example holds in this runner
+[SKIPPED] lint          project does not configure ruff
+[SKIPPED] types         project does not configure mypy
+[PASSED ] tests         all tests pass after the patch
+
+result: VERIFIED  confidence: high
+
+$ depfix approve 7447a803ff --repo /tmp/demo2
+
+Finding 7447a803ff   src/app.py:6   rule STD-0003
+logging.warn is a deprecated alias of logging.warning. (rule STD-0003)
+source: https://docs.python.org/3/library/logging.html#logging.warning
+
+--- a/src/app.py
++++ b/src/app.py
+@@ -3,7 +3,7 @@
+ 
+ 
+ def greet(name):
+-    logging.warn('hi %s', name)
++    logging.warning('hi %s', name)
+     return f'hello {name}'
+ 
+ 
+
+[PASSED ] diff_scope: touches only src/app.py
+[PASSED ] applies: patch applies cleanly
+[PASSED ] parses: patched file parses
+[PASSED ] finding_gone: target usage removed, no new deprecated usage introduced
+[PASSED ] diff_minimal: 1 line(s) replaced by 1, all inside the finding
+[PASSED ] provenance: diff is exactly what the rule produces
+[PASSED ] rule_example: STD-0003 example holds in this runner
+[SKIPPED] lint: project does not configure ruff
+[SKIPPED] types: project does not configure mypy
+[PASSED ] tests: all tests pass after the patch
+
+verification: PASSED, confidence high
+Approve this exact change? [y/N] approved until 2026-10-30T09:24:00+00:00. Next: depfix apply 7447a803ff --execute
+
+$ depfix apply 7447a803ff --repo /tmp/demo2
+Plan:
+  - create branch depfix/7447a803ff from main
+  - apply the approved diff to src/app.py (checked first with git apply --check)
+  - commit it with the rule, source and verification summary in the message
+  - your current branch (main) is not touched
+
+DRY RUN: nothing was changed. Re-run with --execute to apply.
+
+$ depfix apply 7447a803ff --repo /tmp/demo2 --execute
+Done:
+  - create branch depfix/7447a803ff from main
+  - apply the approved diff to src/app.py (checked first with git apply --check)
+  - commit it with the rule, source and verification summary in the message
+  - your current branch (main) is not touched
+
+Applied on branch depfix/7447a803ff (commit 24e9689).
+To undo:  git switch main && git branch -D depfix/7447a803ff
+To keep:  review it, then merge depfix/7447a803ff the way you normally would.
+
+$ git log --oneline --all
+24e9689 depfix: logging.warn is a deprecated alias of logging.warning. (STD-0003)
+20c1cf0 init
+
