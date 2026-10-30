@@ -1,0 +1,212 @@
+# NumPy 2.0 removals. Every row below was checked against the 'Main namespace' removed-members
+# table of the official migration guide. Fixes are backwards compatible (valid on NumPy 1.x too).
+# NINF is wrapped in parentheses so that `np.NINF ** 2` keeps its meaning.
+rules:
+  - id: NP-0001
+    library: numpy
+    match: attribute
+    qualified_name: numpy.float_
+    removed_in: "2.0"
+    summary: "np.float_ was removed in NumPy 2.0; use np.float64."
+    fix: {kind: template, template: "{numpy.float64}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.float_(1)"
+      before_effect: removed
+      after: "float(np.float64(1))"
+      expect: "1.0"
+  - id: NP-0002
+    library: numpy
+    match: attribute
+    qualified_name: numpy.complex_
+    removed_in: "2.0"
+    summary: "np.complex_ was removed in NumPy 2.0; use np.complex128."
+    fix: {kind: template, template: "{numpy.complex128}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.complex_(1)"
+      before_effect: removed
+      after: "complex(np.complex128(1))"
+      expect: "(1+0j)"
+  - id: NP-0003
+    library: numpy
+    match: attribute
+    qualified_name: numpy.NaN
+    removed_in: "2.0"
+    summary: "np.NaN was removed in NumPy 2.0; use np.nan."
+    fix: {kind: template, template: "{numpy.nan}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.NaN"
+      before_effect: removed
+      after: "bool(np.isnan(np.nan))"
+      expect: "True"
+  - id: NP-0004
+    library: numpy
+    match: attribute
+    qualified_name: numpy.Inf
+    removed_in: "2.0"
+    summary: "np.Inf was removed in NumPy 2.0; use np.inf."
+    fix: {kind: template, template: "{numpy.inf}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.Inf"
+      before_effect: removed
+      after: "float(np.inf)"
+      expect: "inf"
+  - id: NP-0005
+    library: numpy
+    match: attribute
+    qualified_name: numpy.infty
+    removed_in: "2.0"
+    summary: "np.infty was removed in NumPy 2.0; use np.inf."
+    fix: {kind: template, template: "{numpy.inf}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.infty"
+      before_effect: removed
+      after: "float(np.inf)"
+      expect: "inf"
+  - id: NP-0006
+    library: numpy
+    match: attribute
+    qualified_name: numpy.product
+    removed_in: "2.0"
+    summary: "np.product was removed in NumPy 2.0; use np.prod."
+    fix: {kind: template, template: "{numpy.prod}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.product([2, 3])"
+      before_effect: removed
+      after: "int(np.prod([2, 3]))"
+      expect: "6"
+  - id: NP-0007
+    library: numpy
+    match: attribute
+    qualified_name: numpy.cumproduct
+    removed_in: "2.0"
+    summary: "np.cumproduct was removed in NumPy 2.0; use np.cumprod."
+    fix: {kind: template, template: "{numpy.cumprod}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.cumproduct([1, 2, 3])"
+      before_effect: removed
+      after: "np.cumprod([1, 2, 3]).tolist()"
+      expect: "[1, 2, 6]"
+  - id: NP-0008
+    library: numpy
+    match: attribute
+    qualified_name: numpy.sometrue
+    removed_in: "2.0"
+    summary: "np.sometrue was removed in NumPy 2.0; use np.any."
+    fix: {kind: template, template: "{numpy.any}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.sometrue([0, 1])"
+      before_effect: removed
+      after: "bool(np.any([0, 1]))"
+      expect: "True"
+  - id: NP-0009
+    library: numpy
+    match: attribute
+    qualified_name: numpy.alltrue
+    removed_in: "2.0"
+    summary: "np.alltrue was removed in NumPy 2.0; use np.all."
+    fix: {kind: template, template: "{numpy.all}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.alltrue([1, 0])"
+      before_effect: removed
+      after: "bool(np.all([1, 0]))"
+      expect: "False"
+  - id: NP-0010
+    library: numpy
+    match: attribute
+    qualified_name: numpy.round_
+    removed_in: "2.0"
+    summary: "np.round_ was removed in NumPy 2.0; use np.round."
+    fix: {kind: template, template: "{numpy.round}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.round_(2.6)"
+      before_effect: removed
+      after: "float(np.round(2.6))"
+      expect: "3.0"
+  - id: NP-0011
+    library: numpy
+    match: attribute
+    qualified_name: numpy.string_
+    removed_in: "2.0"
+    summary: "np.string_ was removed in NumPy 2.0; use np.bytes_."
+    fix: {kind: template, template: "{numpy.bytes_}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.string_(b'a')"
+      before_effect: removed
+      after: "bool(np.bytes_(b'a') == b'a')"
+      expect: "True"
+  - id: NP-0012
+    library: numpy
+    match: attribute
+    qualified_name: numpy.unicode_
+    removed_in: "2.0"
+    summary: "np.unicode_ was removed in NumPy 2.0; use np.str_."
+    fix: {kind: template, template: "{numpy.str_}"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.unicode_('a')"
+      before_effect: removed
+      after: "str(np.str_('a'))"
+      expect: "'a'"
+  - id: NP-0013
+    library: numpy
+    match: attribute
+    qualified_name: numpy.NINF
+    removed_in: "2.0"
+    summary: "np.NINF was removed in NumPy 2.0; use -np.inf."
+    fix: {kind: template, template: "(-{numpy.inf})"}
+    reference:
+      url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+      section: "Main namespace (removed members)"
+    example:
+      setup: "import numpy as np"
+      before: "np.NINF"
+      before_effect: removed
+      after: "float(-np.inf)"
+      expect: "-inf"

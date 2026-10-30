@@ -1,0 +1,147 @@
+# Python standard library rules. Their `example` blocks are executed by `depfix rules --selftest`
+# on YOUR interpreter, which asserts that the "before" really warns or fails and the "after" works.
+# Always check the reference page for the Python version you target.
+rules:
+  - id: STD-0001
+    library: stdlib
+    match: call
+    qualified_name: datetime.datetime.utcnow
+    deprecated_in: "3.12"
+    summary: "datetime.utcnow() is deprecated; the exact naive-UTC equivalent is now(timezone.utc).replace(tzinfo=None)."
+    fix:
+      kind: template
+      template: "{datetime.datetime}.now({datetime.timezone.utc}).replace(tzinfo=None)"
+      arity: {positional: 0}
+    reference:
+      url: https://docs.python.org/3/library/datetime.html#datetime.datetime.utcnow
+      section: "datetime.utcnow (deprecated since 3.12)"
+    example:
+      setup: "import datetime"
+      before: "isinstance(datetime.datetime.utcnow(), datetime.datetime) and datetime.datetime.utcnow().tzinfo is None"
+      before_effect: warns
+      after: "isinstance(datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None), datetime.datetime) and datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).tzinfo is None"
+      expect: "True"
+      equivalent: true
+
+  - id: STD-0002
+    library: stdlib
+    match: call
+    qualified_name: datetime.datetime.utcfromtimestamp
+    deprecated_in: "3.12"
+    summary: "datetime.utcfromtimestamp(ts) is deprecated; use fromtimestamp(ts, timezone.utc), dropping tzinfo to keep a naive result."
+    fix:
+      kind: template
+      template: "{datetime.datetime}.fromtimestamp({args}, {datetime.timezone.utc}).replace(tzinfo=None)"
+      arity: {positional: 1}
+    reference:
+      url: https://docs.python.org/3/library/datetime.html#datetime.datetime.utcfromtimestamp
+      section: "datetime.utcfromtimestamp (deprecated since 3.12)"
+    example:
+      setup: "import datetime"
+      before: "datetime.datetime.utcfromtimestamp(86400)"
+      before_effect: warns
+      after: "datetime.datetime.fromtimestamp(86400, datetime.timezone.utc).replace(tzinfo=None)"
+      expect: "datetime.datetime(1970, 1, 2, 0, 0)"
+      equivalent: true
+
+  - id: STD-0003
+    library: stdlib
+    match: attribute
+    qualified_name: logging.warn
+    deprecated_in: "3.3"
+    summary: "logging.warn is a deprecated alias of logging.warning."
+    fix: {kind: template, template: "{logging.warning}"}
+    reference:
+      url: https://docs.python.org/3/library/logging.html#logging.warning
+      section: "logging.warning (warn is a deprecated alias)"
+    example:
+      setup: "import logging"
+      before: "logging.warn('x')"
+      before_effect: warns
+      after: "logging.warning('x')"
+      expect: "None"
+      equivalent: true
+
+  - id: STD-0004
+    library: stdlib
+    match: attribute
+    qualified_name: threading.currentThread
+    deprecated_in: "3.10"
+    summary: "threading.currentThread is a deprecated alias of threading.current_thread."
+    fix: {kind: template, template: "{threading.current_thread}"}
+    reference:
+      url: https://docs.python.org/3/library/threading.html#threading.current_thread
+      section: "threading.current_thread (currentThread is a deprecated alias)"
+    example:
+      setup: "import threading"
+      before: "threading.currentThread().name"
+      before_effect: warns
+      after: "threading.current_thread().name"
+      expect: "'MainThread'"
+      equivalent: true
+
+  - id: STD-0005
+    library: stdlib
+    match: attribute
+    qualified_name: threading.activeCount
+    deprecated_in: "3.10"
+    summary: "threading.activeCount is a deprecated alias of threading.active_count."
+    fix: {kind: template, template: "{threading.active_count}"}
+    reference:
+      url: https://docs.python.org/3/library/threading.html#threading.active_count
+      section: "threading.active_count (activeCount is a deprecated alias)"
+    example:
+      setup: "import threading"
+      before: "threading.activeCount()"
+      before_effect: warns
+      after: "threading.active_count()"
+      expect: "1"
+      equivalent: true
+
+  - id: STD-0006
+    library: stdlib
+    match: attribute
+    qualified_name: base64.encodestring
+    removed_in: "3.9"
+    summary: "base64.encodestring was removed in 3.9; use base64.encodebytes."
+    fix: {kind: template, template: "{base64.encodebytes}"}
+    reference:
+      url: https://docs.python.org/3/library/base64.html#base64.encodebytes
+      section: "base64.encodebytes"
+    example:
+      setup: "import base64"
+      before: "base64.encodestring(b'hi')"
+      before_effect: removed
+      after: "base64.encodebytes(b'hi')"
+      expect: "b'aGk=\\n'"
+
+  - id: STD-0007
+    library: stdlib
+    match: attribute
+    qualified_name: base64.decodestring
+    removed_in: "3.9"
+    summary: "base64.decodestring was removed in 3.9; use base64.decodebytes."
+    fix: {kind: template, template: "{base64.decodebytes}"}
+    reference:
+      url: https://docs.python.org/3/library/base64.html#base64.decodebytes
+      section: "base64.decodebytes"
+    example:
+      setup: "import base64"
+      before: "base64.decodestring(b'aGk=\\n')"
+      before_effect: removed
+      after: "base64.decodebytes(b'aGk=\\n')"
+      expect: "b'hi'"
+
+  # No template: the right replacement (asyncio.run, get_running_loop, new_event_loop...) depends on
+  # the surrounding code, so this rule is routed to the model path (drop 3).
+  - id: STD-0008
+    library: stdlib
+    match: call
+    qualified_name: asyncio.get_event_loop
+    deprecated_in: "3.12"
+    summary: "asyncio.get_event_loop() warns when no loop is running; the correct replacement depends on context."
+    fix: {kind: llm}
+    needs_review: true
+    reference:
+      url: https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.get_event_loop
+      section: "asyncio.get_event_loop"

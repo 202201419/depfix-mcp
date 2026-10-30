@@ -1,0 +1,8 @@
+description: 'from-import usage: detected, but a template would need an added import'
+tags: []
+strict_warnings: false
+expected:
+- rule: NP-0001
+  file: src/conv.py
+  line: 5
+  fix: not_applicable

@@ -1,0 +1,9 @@
+description: 'KNOWN GAP: getattr(np, ''float_'') is invisible to static scanning (miss)'
+tags:
+- known_gap
+strict_warnings: false
+expected:
+- rule: NP-0001
+  file: src/make.py
+  line: 5
+  fix: template_ok

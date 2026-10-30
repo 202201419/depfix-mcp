@@ -1,0 +1,8 @@
+description: an unusual import alias must still be resolved
+tags: []
+strict_warnings: false
+expected:
+- rule: NP-0003
+  file: src/values.py
+  line: 5
+  fix: template_ok

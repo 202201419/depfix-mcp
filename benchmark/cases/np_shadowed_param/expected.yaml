@@ -1,0 +1,5 @@
+description: 'KNOWN GAP: a parameter named np shadows the import (false positive)'
+tags:
+- known_gap
+strict_warnings: false
+expected: []

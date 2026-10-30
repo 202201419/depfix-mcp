@@ -1,0 +1,8 @@
+description: np.float_ through the usual np alias
+tags: []
+strict_warnings: false
+expected:
+- rule: NP-0001
+  file: src/calc.py
+  line: 5
+  fix: template_ok

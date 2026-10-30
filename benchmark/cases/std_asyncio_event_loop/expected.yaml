@@ -1,0 +1,8 @@
+description: 'context-dependent fix: must be routed to the model, not templated'
+tags: []
+strict_warnings: false
+expected:
+- rule: STD-0008
+  file: src/loops.py
+  line: 5
+  fix: needs_llm

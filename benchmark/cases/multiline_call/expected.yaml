@@ -1,0 +1,8 @@
+description: a call spanning three lines is replaced as one unit
+tags: []
+strict_warnings: true
+expected:
+- rule: STD-0002
+  file: src/epoch.py
+  line: 5
+  fix: template_ok

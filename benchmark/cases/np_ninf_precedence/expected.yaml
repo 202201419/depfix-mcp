@@ -1,0 +1,8 @@
+description: -np.inf must be parenthesised or `** 2` changes meaning
+tags: []
+strict_warnings: false
+expected:
+- rule: NP-0013
+  file: src/inf.py
+  line: 5
+  fix: template_ok
