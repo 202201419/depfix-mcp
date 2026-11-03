@@ -105,3 +105,77 @@ def make_verified(repo: Path, run_tests: bool = False) -> str:
     v = pipeline.verify(repo, fid, VerifyConfig(runner=LocalRunner(), run_tests=run_tests))
     assert v.passed, [(c.name, c.status, c.detail) for c in v.checks]
     return fid
+
+
+# ---- drop 3 helpers ----------------------------------------------------------------------------
+
+import io  # noqa: E402
+import json  # noqa: E402
+import threading  # noqa: E402
+import urllib.error  # noqa: E402
+from collections.abc import Callable  # noqa: E402
+from http.server import BaseHTTPRequestHandler, HTTPServer  # noqa: E402
+from typing import Any  # noqa: E402
+
+from depfix.embed import Embedder, HashEmbedder  # noqa: E402
+from depfix.index import Index  # noqa: E402
+from depfix.indexer import build_index  # noqa: E402
+from depfix.sources import load_sources, read_source  # noqa: E402
+
+DOCS = Path(__file__).parent.parent / "benchmark" / "docs"
+
+
+def fixture_index(
+    chunker: str = "entry", embedder: Embedder | None = None
+) -> tuple[Index, Embedder]:
+    """An in-memory index of the original-text documentation fixtures (no network, no model)."""
+    emb = embedder or HashEmbedder()
+    idx = Index(":memory:")
+    build_index(
+        idx, load_sources(DOCS / "sources.yaml"), emb, chunker,
+        lambda s: read_source(s, Path("/nonexistent"), DOCS),
+    )  # fmt: skip
+    return idx, emb
+
+
+class FakeOllama:
+    """A real HTTP server on 127.0.0.1 that speaks just enough of Ollama's API for tests."""
+
+    def __init__(self, handler: Callable[[str, str, dict[str, Any]], tuple[int, Any]]) -> None:
+        self.requests: list[tuple[str, str, dict[str, Any]]] = []
+        outer = self
+
+        class H(BaseHTTPRequestHandler):
+            def _do(self, method: str) -> None:
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}") if n else {}
+                outer.requests.append((method, self.path, body))
+                code, payload = handler(method, self.path, body)
+                raw = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
+            def do_POST(self) -> None:  # noqa: N802
+                self._do("POST")
+
+            def do_GET(self) -> None:  # noqa: N802
+                self._do("GET")
+
+            def log_message(self, *a: Any) -> None:
+                pass
+
+        self.server = HTTPServer(("127.0.0.1", 0), H)
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def stop(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def http_error(code: int, body: str = "") -> urllib.error.HTTPError:
+    return urllib.error.HTTPError("https://x", code, "err", {}, io.BytesIO(body.encode()))  # type: ignore[arg-type]

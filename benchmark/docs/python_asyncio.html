@@ -1,0 +1,8 @@
+<html><head><title>asyncio event loop</title></head><body>
+<nav>Navigation that must be ignored</nav>
+<section id="event-loop"><h1>asyncio event loop<a class="headerlink" href="#event-loop">&para;</a></h1>
+<p>Event loop and task management.</p>
+<dl class="py function"><dt class="sig" id="asyncio.run"><span>asyncio.run(coro)</span></dt><dd><p>Runs a coroutine to completion and manages the event loop for you. Use it as the single entry point of a program.</p></dd></dl>
+<dl class="py function"><dt class="sig" id="asyncio.get_running_loop"><span>asyncio.get_running_loop()</span></dt><dd><p>Returns the running loop. Raises RuntimeError when called outside a coroutine or callback.</p></dd></dl>
+<dl class="py function"><dt class="sig" id="asyncio.get_event_loop"><span>asyncio.get_event_loop()</span></dt><dd><p>Returns the current loop.</p><div class="deprecated"><p>Emits a deprecation warning when no loop is running. Inside coroutines call asyncio.get_running_loop. At the top level of a program prefer asyncio.run. The right choice depends on where the call sits.</p></div></dd></dl>
+</section><footer>Footer that must be ignored</footer></body></html>

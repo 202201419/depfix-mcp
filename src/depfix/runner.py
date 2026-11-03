@@ -224,14 +224,19 @@ def make_docker_runner(image: str | None = None) -> DockerRunner:
     return DockerRunner(image=img)
 
 
-def sandbox_build(image: str | None = None) -> Proc:
-    """Build the default image. This is the ONE step that uses the network (pip install)."""
-    dockerfile = (resources.files("depfix") / "sandbox" / "Dockerfile").read_text(encoding="utf-8")
+def sandbox_build(image: str | None = None, minimal: bool = False) -> int:
+    """Build the sandbox image. This is the ONE step that uses the network (pip install).
+
+    Output streams live, so a slow download looks slow instead of looking frozen. `minimal` builds
+    a pytest-only image: much smaller, and enough for projects that need nothing else.
+    """
+    name = "Dockerfile.minimal" if minimal else "Dockerfile"
+    dockerfile = (resources.files("depfix") / "sandbox" / name).read_text(encoding="utf-8")
     r = subprocess.run(
-        ["docker", "build", "-t", image or DEFAULT_IMAGE, "-"],
-        input=dockerfile, text=True, capture_output=True, check=False,
+        ["docker", "build", "--progress=plain", "-t", image or DEFAULT_IMAGE, "-"],
+        input=dockerfile, text=True, check=False,
     )  # fmt: skip
-    return Proc(r.returncode, (r.stdout + r.stderr)[-2000:], False)
+    return r.returncode
 
 
 _PROBE = r"""

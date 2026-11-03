@@ -121,3 +121,54 @@ is only as good as the mutations it kills.
    unchanged since verification, the approval valid for this exact diff.
 8. Template: the diff must equal what the rule produces exactly. Model: it must cite sources and
    every new name must appear in the cited text.
+
+
+---
+
+# Drop 3 exercises
+
+## A. Break-it (each answer verified by running the mutation)
+
+| # | Change | What fails | Why it matters |
+|---|--------|-----------|----------------|
+| 1 | In `validate_replacement`, make the `DENY_NAMES` check `if False:` | `test_dangerous_or_malformed_replacements...[eval('1')]` | the model could introduce `eval` |
+| 2 | In `propose_model`, make the citation check `if False:` | `test_an_answer_that_cites_nothing_is_invalid`, `test_citing_an_excerpt...` | uncited or invented citations would pass |
+| 3 | In `retrieve.mentions`, return `symbol in text` | `test_symbols_match_whole_names_only`, `test_the_anchor_layer...` | `warn` would match `warning` and rank the wrong entry first |
+| 4 | In `validate_replacement`, make the name-visibility check `if False:` | `...[pd.concat([a])-not imported]` | the model could invent modules and imports |
+| 5 | In `OllamaClient`, make the host check `if False:` | `test_remote_servers_are_refused...` | your code could leave the machine |
+| 6 | In `fix_with_model`, make the early-stop `if False:` | `test_a_refusal_ends_the_loop_immediately`, `test_no_documentation...` | wasted model calls and retries after an honest refusal |
+| 7 | In `_sanitize_doc`, delete the fence replacement | `test_documentation_cannot_close_its_own_fence...` | a documentation page could inject instructions |
+| 8 | In `fetch_html`, make the robots check `if False:` | three `robots` tests | the fetcher would ignore robots.txt |
+| 9 | In `propose_model`, make the no-evidence guard `if False:` | `test_no_documentation_means_no_model_call` | the model would answer with no sources |
+
+## B. Trace it
+
+1. Read `docs/EXAMPLE_MODEL.txt`. For each line, name the function that printed it.
+2. Run `depfix explain <id>` and find which retrieval layer (anchor, keyword, vector) returned each
+   excerpt. Why is the anchored one first?
+3. In `benchmark/policies.py`, change `sloppy` so it makes a different mistake. Predict which check
+   fails first, then run `python -m benchmark.llm_runner --llm policy:sloppy --only std_logging_warn`.
+
+## C. Quiz (answers at the bottom)
+
+1. Why can the model only replace the flagged expression instead of rewriting the function?
+2. Why does a retry include the previous answer and the failing check?
+3. Why is `warn` matched as a whole word?
+4. What is stored in a recording, and what deliberately is not?
+5. Why does the benchmark use a hash embedder and original-text docs?
+6. What does `provenance` prove about a model fix, and what can it not prove?
+7. Why does the loop stop on a refusal instead of retrying?
+8. Why does a shared SQLite connection need a lock here?
+
+### Answers
+
+1. A small span is easy to validate and cannot touch other code, other files or imports.
+2. At temperature 0 the same prompt gives the same answer; only new information can change it.
+3. As a substring it matched `warning`, which ranked the wrong documentation entry first.
+4. A hash of the request and the model's answer; never the prompt, which holds your code and docs.
+5. They are deterministic and licence-free, so a recording replays identically in CI.
+6. That every new name it introduced appears in text it cited. Not that the cited text is right.
+7. A refusal is the model saying the documentation does not support a change; asking again would
+   just pressure it into guessing.
+8. The benchmark queries one index from several threads; SQLite connections do not allow that by
+   default, and interleaved queries would corrupt results.

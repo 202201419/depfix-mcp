@@ -1,0 +1,47 @@
+# Public documentation that `depfix index build` downloads to YOUR machine. Nothing here is
+# committed as text; only the list, the licences and the attribution.
+# Licences were checked: NumPy's documentation states "Licensed under the 3-clause BSD License";
+# the Python documentation is licensed under the PSF License Version 2 (examples additionally 0BSD).
+sources:
+  - id: numpy-2-migration
+    library: numpy
+    version: "2.2"
+    url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+    license: BSD-3-Clause
+    license_url: https://numpy.org/doc/2.4/license.html
+    attribution: "NumPy Developers. NumPy 2.0 migration guide."
+  - id: python-datetime
+    library: stdlib
+    version: "3"
+    url: https://docs.python.org/3/library/datetime.html
+    license: PSF-2.0
+    license_url: https://docs.python.org/3/license.html
+    attribution: "Python Software Foundation. Python documentation: datetime."
+  - id: python-logging
+    library: stdlib
+    version: "3"
+    url: https://docs.python.org/3/library/logging.html
+    license: PSF-2.0
+    license_url: https://docs.python.org/3/license.html
+    attribution: "Python Software Foundation. Python documentation: logging."
+  - id: python-threading
+    library: stdlib
+    version: "3"
+    url: https://docs.python.org/3/library/threading.html
+    license: PSF-2.0
+    license_url: https://docs.python.org/3/license.html
+    attribution: "Python Software Foundation. Python documentation: threading."
+  - id: python-base64
+    library: stdlib
+    version: "3"
+    url: https://docs.python.org/3/library/base64.html
+    license: PSF-2.0
+    license_url: https://docs.python.org/3/license.html
+    attribution: "Python Software Foundation. Python documentation: base64."
+  - id: python-asyncio-eventloop
+    library: stdlib
+    version: "3"
+    url: https://docs.python.org/3/library/asyncio-eventloop.html
+    license: PSF-2.0
+    license_url: https://docs.python.org/3/license.html
+    attribution: "Python Software Foundation. Python documentation: asyncio event loop."

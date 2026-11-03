@@ -116,3 +116,66 @@ can support a wrong change.
 
 **D31. `rule_example` re-runs the rule's claim inside the verification environment.** The
 container's library versions can differ from yours.
+
+
+# Drop 3 decisions
+
+**D32. No new dependencies.** Ollama is spoken to over plain HTTP with the standard library; HTML
+is parsed with `html.parser`; vectors live in SQLite. Fewer packages means fewer things to break
+or audit, and `uv.lock` is unchanged.
+
+**D33. Local-only model server.** The prompt contains your code, so any non-local Ollama address
+is refused unless `DEPFIX_ALLOW_REMOTE_OLLAMA=1`. Privacy is a default, not an option.
+
+**D34. One SQLite file for keyword AND vector search.** FTS5 gives BM25 ranking; vectors are stored
+as float32 blobs and compared with a dot product. Fine for thousands of chunks (we have tens);
+revisit past about 20,000 chunks (then consider sqlite-vec). Chroma and FAISS were skipped to avoid
+heavy dependencies.
+
+**D35. Chunk by entry, with a fixed-window control.** Migration docs are tables and definition
+lists. A window can cut "old name" from "use this instead"; an entry chunk cannot. The parser makes
+one definition one block (found by a failing test). `entry` vs `fixed` is experiment E1, not an
+assumption.
+
+**D36. Three retrieval layers, matched on whole words.** Anchor (the rule's own page), keyword
+(exact identifiers, where embeddings are weak) and vector (paraphrase). A test found the anchor
+layer ranking `logging.warning` above `logging.warn` because `warn` is a substring of `warning`;
+symbols now match as whole names.
+
+**D37. No documentation, no model call.** Without evidence the model would only guess, so the loop
+stops with `no_evidence`.
+
+**D38. The model may replace exactly one expression.** It returns text for the flagged span, so it
+cannot edit other code, add statements or touch other files. The same `splice` and diff machinery
+as templates then builds the diff.
+
+**D39. A replacement must use names the file already has.** Every name must be imported, a builtin,
+bound inside the replacement, or visible in the code shown. This blocks invented modules early and
+makes "adding imports" an honest limitation rather than a silent risk.
+
+**D40. Output is untrusted until validated.** Shape, citation ids, single line, valid expression,
+no eval/exec/open/dunder access, no await/yield/walrus, file still parses, expression changed.
+
+**D41. Citations are checked for support.** `provenance` requires every NEW name in a model fix to
+appear in the text it cited (rule-based, no judge model). Limit: a source can support a wrong change.
+
+**D42. Retries carry the failure.** At temperature 0 the same prompt gives the same answer, so a retry
+sends the previous answer plus the failing check's message. Capped at 2 retries. A refusal, a stale
+file or missing documentation ends the loop immediately.
+
+**D43. Record and replay by request hash.** The key hashes the model, messages, schema and options.
+Recordings hold only the hash and the answer, so no prompt text (code or documentation) is stored.
+
+**D44. Benchmarks use original-text fixture docs and a deterministic embedder.** A recording made on
+your Mac replays identically in CI, with no scraping and no licensing question. Real-documentation
+retrieval is measured separately (`make exp-retrieval`).
+
+**D45. Simulated models test the machinery.** `oracle`, `sloppy`, `stubborn`, `refuser`, `garbage`
+and `uncited` exercise every branch of the loop without Ollama. They say nothing about real model
+quality; only `make record` does.
+
+**D46. The index remembers its embedder.** Queries read the embedder name from the index, so a query
+can never be compared with vectors from a different model.
+
+**D47. A shared SQLite connection needs a lock.** The benchmark queries one index from a thread pool;
+the first version crashed (found by a test). All index access now goes through one lock.

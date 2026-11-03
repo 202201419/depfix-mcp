@@ -1,0 +1,40 @@
+# Original text written for depfix (MIT). These pages imitate the STRUCTURE of public
+# documentation (tables, definition lists) so tests and the benchmark need no scraping.
+# Their urls equal the real pages the rules cite, which is how anchor retrieval finds them.
+sources:
+  - id: fixture-numpy-removals
+    library: numpy
+    version: "fixture"
+    url: https://numpy.org/doc/2.2/numpy_2_0_migration_guide.html
+    license: MIT (original text written for depfix)
+    path: numpy_removals.html
+  - id: fixture-python-datetime
+    library: stdlib
+    version: "fixture"
+    url: https://docs.python.org/3/library/datetime.html
+    license: MIT (original text written for depfix)
+    path: python_datetime.html
+  - id: fixture-python-logging
+    library: stdlib
+    version: "fixture"
+    url: https://docs.python.org/3/library/logging.html
+    license: MIT (original text written for depfix)
+    path: python_logging.html
+  - id: fixture-python-threading
+    library: stdlib
+    version: "fixture"
+    url: https://docs.python.org/3/library/threading.html
+    license: MIT (original text written for depfix)
+    path: python_threading.html
+  - id: fixture-python-base64
+    library: stdlib
+    version: "fixture"
+    url: https://docs.python.org/3/library/base64.html
+    license: MIT (original text written for depfix)
+    path: python_base64.html
+  - id: fixture-python-asyncio
+    library: stdlib
+    version: "fixture"
+    url: https://docs.python.org/3/library/asyncio-eventloop.html
+    license: MIT (original text written for depfix)
+    path: python_asyncio.html

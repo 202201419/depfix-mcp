@@ -101,9 +101,16 @@ def check_arity(node: ast.Call, arity: Arity | None) -> str | None:
     return None
 
 
-def propose_template(repo: Path, f: Finding, rule: Rule) -> ProposeResult:
-    if rule.fix.kind != "template" or rule.fix.template is None:
-        return ProposeResult("needs_llm", None, "this rule needs a model-written fix (drop 3)")
+@dataclass
+class Prepared:
+    text: str
+    tree: ast.Module
+    node: ast.expr
+
+
+def prepare(repo: Path, f: Finding, rule: Rule) -> Prepared | ProposeResult:
+    """Everything both fix paths must check before touching a file: safe path, unchanged file,
+    parseable source, and the finding still being where it was."""
     if not _SAFE_PATH.match(f.file):
         return ProposeResult("not_applicable", None, "path has characters the diff builder rejects")
     path = repo / f.file
@@ -120,6 +127,16 @@ def propose_template(repo: Path, f: Finding, rule: Rule) -> ProposeResult:
     node = locate_node(tree, f, rule.match)
     if node is None:
         return ProposeResult("stale", None, "could not find the finding in the file")
+    return Prepared(text, tree, node)
+
+
+def propose_template(repo: Path, f: Finding, rule: Rule) -> ProposeResult:
+    if rule.fix.kind != "template" or rule.fix.template is None:
+        return ProposeResult("needs_llm", None, "this rule needs a model-written fix")
+    prep = prepare(repo, f, rule)
+    if isinstance(prep, ProposeResult):
+        return prep
+    text, tree, node = prep.text, prep.tree, prep.node
 
     args_text = ""
     if rule.match == "call":

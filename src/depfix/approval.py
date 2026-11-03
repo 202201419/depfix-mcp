@@ -24,14 +24,13 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from .models import Approval
+from .paths import home
 
 DEFAULT_TTL_S = 900
 
 
 def key_path() -> Path:
-    base = os.environ.get("DEPFIX_HOME")
-    root = Path(base) if base else Path.home() / ".config" / "depfix"
-    return root / "approval.key"
+    return home() / "approval.key"
 
 
 def _key() -> bytes:

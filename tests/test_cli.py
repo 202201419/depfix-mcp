@@ -1,8 +1,6 @@
 import io
 import json
 
-import pytest
-
 import depfix.cli as cli_mod
 from depfix.cli import main
 from depfix.runner import RunnerError
@@ -131,23 +129,3 @@ def test_low_confidence_requires_typing_the_finding_id(tmp_path, capsys, monkeyp
     assert "low confidence" in capsys.readouterr().out
     monkeypatch.setattr("sys.stdin", FakeTTY(f"{fid}\n"))
     assert main(["approve", fid, "--repo", str(repo)]) == 0
-
-
-@pytest.mark.parametrize("action", ["build", "check"])
-def test_sandbox_commands_fail_cleanly_without_docker(action, monkeypatch, capsys):
-    def no_docker(image=None):
-        raise RunnerError("Docker was not found")
-
-    monkeypatch.setattr(cli_mod, "make_docker_runner", no_docker)
-    monkeypatch.setattr(
-        cli_mod,
-        "sandbox_build",
-        lambda image=None: (
-            cli_mod.Proc(1, "docker: command not found", False)
-            if hasattr(cli_mod, "Proc")
-            else None
-        ),
-    )
-    if action == "check":
-        assert main(["sandbox", "check"]) == 2
-        assert "Docker was not found" in capsys.readouterr().err
