@@ -15,8 +15,12 @@ from pathlib import Path
 
 from . import approval as approvals
 from .apply import ApplyRefused, apply_on_branch, branch_name, preflight
+from .embed import Embedder
 from .fixer import ProposeResult, propose_template, render_name
+from .index import Index
+from .llm_fixer import ModelContext, ModelResult, propose_model
 from .models import Approval, Finding, Proposal, Rule, Status, Verification
+from .retrieve import retrieve
 from .rules import RuleSet, load_rules
 from .scanner import collect_aliases, parse_source, scan_repo
 from .store import Store
@@ -32,6 +36,12 @@ def _finding(store: Store, fid: str) -> Finding:
     if f is None:
         raise DepfixError(f"no finding '{fid}'; run `depfix scan` first")
     return f
+
+
+def rule_for(repo: Path, fid: str, rules: RuleSet | None = None) -> Rule:
+    rules = rules or load_rules()
+    with Store(repo) as store:
+        return rules.by_id[_finding(store, fid).rule_id]
 
 
 def _sha(text: str) -> str:
@@ -89,6 +99,82 @@ def verify(repo: Path, fid: str, cfg: VerifyConfig, rules: RuleSet | None = None
         store.save_verification(v)
         store.set_status(fid, Status.VERIFIED if v.passed else Status.FAILED)
         return v
+
+
+# ---- stage 3, model path: propose with a model, and the verify-and-retry loop -------------------
+
+
+def propose_with_model(
+    repo: Path,
+    fid: str,
+    ctx: ModelContext,
+    rules: RuleSet | None = None,
+    previous_raw: str = "",
+    failure: str = "",
+) -> ModelResult:
+    rules = rules or load_rules()
+    with Store(repo) as store:
+        f = _finding(store, fid)
+        if f.status in (Status.SKIPPED, Status.APPROVED, Status.APPLIED):
+            raise DepfixError(f"finding is {f.status.value}; it cannot be proposed again")
+        res = propose_model(repo, f, rules.by_id[f.rule_id], ctx, previous_raw, failure)
+        if res.outcome == "proposed" and res.proposal is not None:
+            store.save_proposal(res.proposal)
+            if f.status != Status.PROPOSED:
+                store.set_status(fid, Status.PROPOSED, note="")
+        else:
+            store.set_note(fid, res.reason)
+        return res
+
+
+@dataclass
+class Attempt:
+    n: int
+    outcome: str  # proposed | refused | invalid | no_evidence | stale
+    passed: bool | None  # verification result; None when nothing was verified
+    failed_checks: list[str] = field(default_factory=list)
+    reason: str = ""
+
+
+def _failure_text(v: Verification) -> str:
+    bad = next(c for c in v.checks if c.status == "failed")
+    detail = "\n".join(bad.detail.splitlines()[:10])
+    return f"Verification check '{bad.name}' failed.\n{detail}"
+
+
+def fix_with_model(
+    repo: Path,
+    fid: str,
+    ctx: ModelContext,
+    cfg: VerifyConfig,
+    rules: RuleSet | None = None,
+    max_retries: int = 2,
+) -> list[Attempt]:
+    """Propose, verify, and on failure show the model WHY and let it try again (bounded).
+
+    A retry only helps because the prompt now contains new information: the failing check and its
+    message. At temperature 0 the same prompt would just repeat the same mistake.
+    """
+    rules = rules or load_rules()
+    attempts: list[Attempt] = []
+    previous, failure = "", ""
+    for n in range(max_retries + 1):
+        res = propose_with_model(repo, fid, ctx, rules, previous, failure)
+        if res.outcome != "proposed":
+            attempts.append(Attempt(n, res.outcome, None, [], res.reason))
+            if res.outcome in ("no_evidence", "stale", "refused"):
+                break  # nothing a retry can fix: no docs, a changed file, or an honest refusal
+            previous, failure = res.raw, f"Your reply was rejected: {res.reason}"
+            continue
+        v = verify(repo, fid, cfg, rules)
+        failed = [c.name for c in v.checks if c.status == "failed"]
+        attempts.append(
+            Attempt(n, "proposed", v.passed, failed, "" if v.passed else _failure_text(v))
+        )
+        if v.passed:
+            break
+        previous, failure = res.raw, _failure_text(v)
+    return attempts
 
 
 # ---- stage 5: human approval, then apply -------------------------------------------------------
@@ -265,19 +351,36 @@ def trace(repo: Path, fid: str, rules: RuleSet | None = None) -> str:
     return "\n".join(out)
 
 
-def explain_text(repo: Path, fid: str, rules: RuleSet | None = None) -> str:
-    """Offline explanation from the rule itself (retrieved docs with citations: drop 3)."""
+def explain_text(
+    repo: Path,
+    fid: str,
+    rules: RuleSet | None = None,
+    index: Index | None = None,
+    embedder: Embedder | None = None,
+) -> str:
+    """Why was this flagged, and what does the documentation say? Cites every source."""
     rules = rules or load_rules()
     with Store(repo) as store:
         f = _finding(store, fid)
     r = rules.by_id[f.rule_id]
     lines = [f"{f.file}:{f.start_line}  {f.snippet}", "", r.summary, ""]
-    lines.append(f"source: {r.reference.url}  ({r.reference.section})")
+    lines.append(f"rule source: {r.reference.url}  ({r.reference.section})")
     if r.deprecated_in:
         lines.append(f"deprecated in: {r.deprecated_in}")
     if r.removed_in:
         lines.append(f"removed in: {r.removed_in}")
     if r.needs_review:
         lines.append("note: the right fix depends on context; a person must review it.")
-    lines.append("(documentation retrieval with citations arrives in drop 3)")
+    if index is not None and embedder is not None and index.count():
+        lines.append("\nRetrieved documentation:")
+        for e in retrieve(index, embedder, r, f.snippet):
+            body = " ".join(e.text.split())
+            lines.append(
+                f"  [{e.chunk_id}] {e.section or '(page)'}  "
+                f"({e.license}; layers: {', '.join(e.layers)})"
+            )
+            lines.append(f"      {body[:300]}")
+            lines.append(f"      source: {e.url}")
+    else:
+        lines.append("\n(no documentation index yet: run `depfix index build` for cited excerpts)")
     return "\n".join(lines)

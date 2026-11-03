@@ -3,7 +3,7 @@
 A verification-first assistant that finds deprecated API usage in Python projects, proposes a
 minimal fix, **proves the fix on an isolated copy** of your repo, and only then asks a human.
 
-> Status: **drop 2 of 4** (deterministic core, sandboxed verification, human approval, apply; no AI yet). Start with `docs/CODEMAP.md`; a real session is in `docs/EXAMPLE_TRACE.txt`.
+> Status: **drop 3 of 4** (sandboxed verification, human approval, apply, documentation retrieval and a local model with retries). Start with `docs/CODEMAP.md`; a real session is in `docs/EXAMPLE_TRACE.txt`.
 
 ## What works today
 
@@ -14,11 +14,13 @@ minimal fix, **proves the fix on an isolated copy** of your repo, and only then 
   your linter and type checker (if configured) see nothing new, and your tests do not regress.
 - A person approves the exact diff in a terminal; `apply` then puts it on a new git branch.
   Nothing changes without that approval, and `apply` is a dry run unless you pass `--execute`.
+- Documentation retrieval with citations (BM25 + vectors) and a local model (Ollama) that writes fixes
+  for rules that have no template, retrying with the verifier's failure message.
 - A benchmark of small synthetic repos with a recorded baseline and a regression gate.
 
 ## What does not exist yet
 
-Model-written fixes and documentation retrieval (drop 3), MCP server and CI (drop 4). Other
+The MCP server and CI workflow (drop 4); published benchmark numbers for real models (run `make record` yourself). Other
 languages are out of scope for the MVP.
 
 ## Quickstart
@@ -31,6 +33,15 @@ uv run depfix propose <id> --repo path/to/project
 uv run depfix verify  <id> --repo path/to/project  # runs in Docker by default
 uv run depfix approve <id> --repo path/to/project  # you, in a terminal
 uv run depfix apply   <id> --repo path/to/project --execute
+```
+
+Model path (needs Ollama, see `docs/MODELS.md`):
+
+```bash
+make smoke-llm                                     # is Ollama ready, and does one real fix work?
+make index                                         # download public docs, build the index (once)
+uv run depfix explain <id> --repo path/to/project  # rule + cited documentation
+uv run depfix fix     <id> --repo path/to/project  # model fix, verify, retry
 ```
 
 See `docs/SANDBOX.md` for Docker setup and `docs/SAFETY.md` for what is and is not protected.

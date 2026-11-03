@@ -1,0 +1,68 @@
+$ depfix index build --docs benchmark/docs/sources.yaml --embedder hash --index /tmp/ex.db
+indexed 45 chunks into /tmp/ex.db (chunker entry, embedder hash-256)
+  - fixture-numpy-removals: 21 chunks; licence MIT (original text written for depfix) 
+  - fixture-python-datetime: 5 chunks; licence MIT (original text written for depfix) 
+  - fixture-python-logging: 5 chunks; licence MIT (original text written for depfix) 
+  - fixture-python-threading: 5 chunks; licence MIT (original text written for depfix) 
+  - fixture-python-base64: 5 chunks; licence MIT (original text written for depfix) 
+  - fixture-python-asyncio: 4 chunks; licence MIT (original text written for depfix) 
+Attribution and licences are stored with every chunk and shown by `depfix explain`.
+
+$ depfix explain 7447a803ff --repo /tmp/demo3 --index /tmp/ex.db
+src/app.py:6  logging.warn
+
+logging.warn is a deprecated alias of logging.warning.
+
+rule source: https://docs.python.org/3/library/logging.html#logging.warning  (logging.warning (warn is a deprecated alias))
+deprecated in: 3.3
+
+Retrieved documentation:
+  [fixture-python-logging#entry:3] logging module  (MIT (original text written for depfix); layers: anchor, keyword, vector)
+      logging module logging.warn(msg, *args, **kwargs): An old spelling kept for compatibility. Deprecated alias of logging.warning. Call logging.warning with the same arguments.
+      source: https://docs.python.org/3/library/logging.html
+  [fixture-python-logging#entry:0] logging module  (MIT (original text written for depfix); layers: keyword, vector)
+      logging module Flexible event logging for applications.
+      source: https://docs.python.org/3/library/logging.html
+  [fixture-python-logging#entry:1] logging module  (MIT (original text written for depfix); layers: keyword, vector)
+      logging module logging.info(msg, *args, **kwargs): Logs a message with level INFO on the root logger.
+      source: https://docs.python.org/3/library/logging.html
+  [fixture-python-logging#entry:2] logging module  (MIT (original text written for depfix); layers: keyword, vector)
+      logging module logging.warning(msg, *args, **kwargs): Logs a message with level WARNING on the root logger.
+      source: https://docs.python.org/3/library/logging.html
+
+$ depfix fix 7447a803ff --repo /tmp/demo3 --index /tmp/ex.db --llm replay:/tmp/ex-rec.jsonl --runner local --allow-local-exec
+runner: local   model: qwen2.5-coder:7b   retries allowed: 2
+attempt 1: proposed     VERIFIED  
+
+result: VERIFIED after 1 attempt(s)
+next: depfix approve 7447a803ff --repo /tmp/demo3
+
+$ depfix trace 7447a803ff --repo /tmp/demo3 | sed -n '/4. PROPOSE/,$p'
+== 4. PROPOSE: the change ==
+--- a/src/app.py
++++ b/src/app.py
+@@ -3,7 +3,7 @@
+ 
+ 
+ def greet(name):
+-    logging.warn('hi %s', name)
++    logging.warning('hi %s', name)
+     return f'hello {name}'
+ 
+ 
+
+== 5. VERIFY: the checks ==
+[PASSED ] diff_scope: touches only src/app.py
+[PASSED ] applies: patch applies cleanly
+[PASSED ] parses: patched file parses
+[PASSED ] finding_gone: target usage removed, no new deprecated usage introduced
+[PASSED ] diff_minimal: 1 line(s) replaced by 1, all inside the finding
+[PASSED ] provenance: every new name is supported by ['fixture-python-logging#entry:3', 'fixture-python-logging#entry:0', 'fixture-python-logging#entry:1', 'fixture-python-logging#entry:2']
+[PASSED ] rule_example: STD-0003 example holds in this runner
+[SKIPPED] lint: project does not configure ruff
+[SKIPPED] types: project does not configure mypy
+[PASSED ] tests: all tests pass after the patch
+overall: PASSED  confidence: high
+
+== 6. APPROVAL ==
+(none; status=verified)

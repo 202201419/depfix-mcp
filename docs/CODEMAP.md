@@ -78,4 +78,32 @@ scan -> propose -> verify (container) -> approve (a person, in a terminal) -> ap
 
 A real session is in `docs/EXAMPLE_APPLY.txt`.
 
-Counts: 21 rules, about 2,100 lines of source, 143 tests, 18 benchmark cases.
+Counts: (see the end of this file for current counts)
+
+
+## Drop 3 additions: documentation index, retrieval and the model path
+
+```
+index build:  doc page --parse--> blocks --chunk--> chunks --embed--> SQLite (FTS5 + vectors)
+fix:          finding --retrieve--> evidence --prompt--> model --validate--> Proposal(kind="llm")
+              --verify--> (fail? show the model why, retry up to 2) --> human approval as before
+```
+
+| File | Role | Understand this |
+|------|------|-----------------|
+| `htmlblocks.py` | web page to structured blocks | one table row / one definition = one block, remembering its heading trail |
+| `chunking.py` | `entry` vs `fixed` chunkers | the experiment: do entry chunks keep old and new names together? |
+| `embed.py` | `Embedder` interface, `HashEmbedder` | the hash embedder is a deterministic stand-in so tests and CI need no model |
+| `index.py` | one SQLite file: BM25 keyword + vector search | thread-safe via a lock; refuses to mix embedders |
+| `sources.py` | polite, allow-listed, robots-obeying fetch | an unreadable robots.txt means NO |
+| `indexer.py` | the build orchestrator | |
+| `retrieve.py` | three layers: anchor, keyword, vector | symbols match as whole words; merged by rank |
+| `llm.py` | `LLM` interface, replay, record, policy doubles | recordings store hashes and answers, never prompts |
+| `ollama.py` | local-only HTTP client, embedder, `llm check` | refuses non-local servers: prompts contain your code |
+| `llm_fixer.py` | prompt, output validation, `propose_model` | the model can replace ONE expression and nothing else |
+| `fixer.py` (changed) | `prepare()` shared by template and model paths | same safety checks for both |
+| `pipeline.py` (changed) | `propose_with_model`, `fix_with_model` | a retry works only because the prompt gains new information |
+| `benchmark/llm_runner.py` | scores the model path with hidden tests | `--repeats` splits flaky from consistent failures |
+| `benchmark/policies.py` | simulated models (perfect, sloppy, stubborn...) | tests the machinery without Ollama |
+
+A real session is in `docs/EXAMPLE_MODEL.txt`.

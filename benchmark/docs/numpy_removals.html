@@ -1,0 +1,29 @@
+<html><head><title>Migration notes</title></head><body>
+<nav>Site menu that must be ignored</nav>
+<section id="migration"><h1>Migrating to the 2.0 series<a class="headerlink" href="#migration">&para;</a></h1>
+<p>This page lists names that no longer exist and what to write instead.</p>
+<section id="main-namespace"><h2>Main namespace</h2>
+<p>The following members were removed from the top level namespace.</p>
+<table><tr><th>Removed name</th><th>What to do</th></tr>
+<tr><td><code>np.float_</code></td><td>Removed in 2.0. Write np.float64 instead; it is the very same scalar type.</td></tr>
+<tr><td><code>np.complex_</code></td><td>Removed. Use np.complex128, the same double precision complex type.</td></tr>
+<tr><td><code>np.NaN</code></td><td>Removed alias. The not-a-number constant is spelled np.nan in lower case.</td></tr>
+<tr><td><code>np.Inf</code></td><td>Removed alias. Positive infinity is np.inf in lower case.</td></tr>
+<tr><td><code>np.infty</code></td><td>Removed alias. Positive infinity is np.inf.</td></tr>
+<tr><td><code>np.product</code></td><td>Removed. The function is called np.prod.</td></tr>
+<tr><td><code>np.cumproduct</code></td><td>Removed. The function is called np.cumprod.</td></tr>
+<tr><td><code>np.sometrue</code></td><td>Removed. Use np.any, which has the same meaning.</td></tr>
+<tr><td><code>np.alltrue</code></td><td>Removed. Use np.all, which has the same meaning.</td></tr>
+<tr><td><code>np.round_</code></td><td>Removed. Call np.round instead.</td></tr>
+<tr><td><code>np.string_</code></td><td>Removed. The bytes scalar type is np.bytes_.</td></tr>
+<tr><td><code>np.unicode_</code></td><td>Removed. The text scalar type is np.str_.</td></tr>
+<tr><td><code>np.NINF</code></td><td>Removed. Negative infinity is written as -np.inf.</td></tr>
+<tr><td><code>np.cast</code></td><td>Removed. Convert with the astype method instead.</td></tr>
+<tr><td><code>np.who</code></td><td>Removed. Inspect variables with ordinary Python tools.</td></tr>
+<tr><td><code>np.asfarray</code></td><td>Removed. Use np.asarray with an explicit floating dtype.</td></tr>
+</table></section>
+<section id="behaviour"><h2>Behaviour changes</h2>
+<p>Scalar printing changed: a float now prints with its type name. Update doctests accordingly.</p>
+<ul><li>Promotion rules for Python scalars changed.</li><li>Some default integer sizes changed on Windows.</li></ul>
+</section></section>
+<footer>Footer text that must be ignored</footer></body></html>

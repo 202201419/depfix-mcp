@@ -1,0 +1,9 @@
+<html><head><title>datetime module</title></head><body>
+<nav>Navigation that must be ignored</nav>
+<section id="module-datetime"><h1>datetime module<a class="headerlink" href="#module-datetime">&para;</a></h1>
+<p>Classes for working with dates and times.</p>
+<dl class="py function"><dt class="sig" id="datetime.datetime.now"><span>datetime.now(tz=None)</span></dt><dd><p>Returns the current local time. Pass a timezone such as timezone.utc to get an aware value.</p></dd></dl>
+<dl class="py function"><dt class="sig" id="datetime.datetime.utcnow"><span>datetime.utcnow()</span></dt><dd><p>Returns the current UTC time as a naive value.</p><div class="deprecated"><p>Deprecated since 3.12. Prefer datetime.now(timezone.utc), which returns an aware value. When a naive value is still required, call .replace(tzinfo=None) on that result.</p></div></dd></dl>
+<dl class="py function"><dt class="sig" id="datetime.datetime.fromtimestamp"><span>datetime.fromtimestamp(timestamp, tz=None)</span></dt><dd><p>Converts a POSIX timestamp. With a timezone argument the result is aware.</p></dd></dl>
+<dl class="py function"><dt class="sig" id="datetime.datetime.utcfromtimestamp"><span>datetime.utcfromtimestamp(timestamp)</span></dt><dd><p>Converts a POSIX timestamp to a naive UTC value.</p><div class="deprecated"><p>Deprecated since 3.12. Use datetime.fromtimestamp(timestamp, timezone.utc); add .replace(tzinfo=None) to keep the result naive.</p></div></dd></dl>
+</section><footer>Footer that must be ignored</footer></body></html>

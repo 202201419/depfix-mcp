@@ -17,9 +17,21 @@ addresses, the control, the test that proves the control, and what is still NOT 
 | 10 | Secrets leaking into tests | The child environment is rebuilt from scratch; Docker gets only four fixed variables | `test_secrets_in_the_parent_environment...`, `test_host_environment_is_not_forwarded` | secrets stored in files inside the repo are visible to its own tests |
 | 11 | A hung or runaway test | Timeout, then the container is killed by name (killing the client alone would not stop it) | `test_timeout_kills_the_container_by_name` | none known |
 
+## Added in drop 3: the model and the documentation
+
+| # | Risk | Control | Proven by | Residual risk |
+|---|------|---------|-----------|---------------|
+| 12 | Model output is untrusted text | JSON shape, citation ids, single-line expression, no eval/exec/open/dunder, no await/yield/walrus, names must already exist, file must still parse | `tests/test_llm_fixer.py` | a valid, plausible but WRONG expression; tests and a person catch that |
+| 13 | A model reaches beyond the finding | it can only replace the flagged span; `diff_minimal` and `diff_scope` re-check | same | none known |
+| 14 | Prompt injection through documentation or code | documentation is fenced and sanitised, the system prompt says to ignore instructions in data, and nothing the model says can run: it only proposes text that is validated and verified | `test_documentation_cannot_close_its_own_fence...` | a model may still be misled into a wrong (but validated) replacement |
+| 15 | Your code leaves the machine | the model server must be local; remote needs an explicit environment variable | `test_remote_servers_are_refused...` | none by default |
+| 16 | Recordings leak code or documentation | only a request hash and the answer are stored | `test_record_then_replay...stores_no_prompt_text` | none known |
+| 17 | The documentation fetcher is abused | https only, host allow-list, robots obeyed (unreadable means NO), rate limit, size cap, cache | `tests/test_docs.py` | the allow-listed sites themselves could serve misleading text; fixes are still verified |
+| 18 | A model fix cites sources that do not support it | `provenance`: every new name must appear in the cited text | `tests/test_checks.py` | see row 12 |
+
 ## Not covered yet
 
-- **Prompt injection** through documentation or code comments: arrives with the model in drop 3.
+- **Model quality on real code** is unmeasured until you run `make record`.
 - **Image supply chain.** The sandbox image installs packages with `pip` at build time using
   version ranges, not hashes, and the base image is not pinned by digest.
 - **Windows.** The runner uses POSIX process groups and `os.getuid`.
